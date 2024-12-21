@@ -1,0 +1,290 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin Panel</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f4f4f4;
+            margin: 0;
+            padding: 0;
+        }
+
+        .container {
+            max-width: 800px;
+            margin: 50px auto;
+            background: #fff;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+        }
+
+        h1, h2 {
+            text-align: center;
+            color: #333;
+        }
+
+        form {
+            margin-bottom: 20px;
+        }
+
+        form label {
+            display: block;
+            margin-top: 10px;
+        }
+
+        form input, form select, form button {
+            width: 100%;
+            padding: 8px;
+            margin-top: 5px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+        }
+
+        form button {
+            background-color: #007BFF;
+            color: white;
+            font-size: 16px;
+            cursor: pointer;
+        }
+
+        form button:hover {
+            background-color: #0056b3;
+        }
+
+        ul {
+            list-style-type: none;
+            padding: 0;
+        }
+
+        ul li {
+            background: #f9f9f9;
+            padding: 10px;
+            margin-bottom: 5px;
+            border-radius: 4px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        ul li .actions {
+            display: flex;
+            gap: 10px;
+        }
+
+        ul li button {
+            padding: 5px 10px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+
+        ul li button.edit {
+            background-color: #007BFF;
+            color: white;
+        }
+
+        ul li button.delete {
+            background-color: #FF0000;
+            color: white;
+        }
+
+        #candidates-container .candidate {
+            margin-bottom: 10px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Admin Panel</h1>
+        {% if message %}
+            <p class="message">{{ message }}</p>
+        {% endif %}
+
+        <h2>Create a Vote</h2>
+        <form action="/create_vote" method="POST">
+            <label for="vote_name">Vote Name:</label>
+            <input type="text" name="vote_name" required>
+
+            <label for="candidates">Add Candidate Details:</label>
+            <div id="candidates-container">
+                <div class="candidate">
+                    <label>Candidate Name:</label>
+                    <input type="text" name="candidate_name[]" required>
+
+                    <label>Candidate Party:</label>
+                    <input type="text" name="candidate_party[]" required>
+                </div>
+            </div>
+
+            <button type="button" id="add-candidate">Add Another Candidate</button>
+            <br><br>
+            <button type="submit">Create Vote</button>
+        </form>
+
+        <h2>Existing Votes</h2>
+<div>
+    {% for vote_id, vote in votes.items() %}
+        <div style="margin-bottom: 30px; padding: 15px; border: 1px solid #ccc; border-radius: 8px;">
+            <h3>{{ vote.vote_name }}</h3>
+            <p><strong>Candidate Details:</strong></p>
+            <ul>
+                {% for candidate in vote.candidates %}
+                    <li>{{ candidate.name }} ({{ candidate.party }}) - Votes: {{ candidate.votes }}</li>
+                {% endfor %}
+            </ul>
+            <p>
+                Total Votes: {{ vote.candidates | sum(attribute='votes') }} /
+                {{ users | length }}
+            </p>
+            <canvas id="chart-{{ vote_id }}" width="400" height="200"></canvas>
+            <form action="/delete_vote" method="POST" style="margin-top: 10px;">
+                <input type="hidden" name="vote_id" value="{{ vote_id }}">
+                <button type="submit" style="background-color: #FF0000; color: white; border: none; padding: 10px 20px; border-radius: 4px; cursor: pointer;">
+                    Delete Vote
+                </button>
+            </form>
+        </div>
+    {% endfor %}
+</div>
+
+        <h2>Manage Users and Admins</h2>
+        <h3>Add User or Admin</h3>
+        <form action="/admin" method="POST">
+            <label for="name">Name:</label>
+            <input type="text" name="name" required>
+
+            <label for="role">Role:</label>
+            <select name="role">
+                <option value="admin">Admin</option>
+                <option value="user">User</option>
+            </select>
+
+            <label>Capture Photo:</label>
+            <video id="video" autoplay></video>
+            <canvas id="canvas" style="display:none;"></canvas>
+            <button type="button" id="capture">Capture Photo</button>
+
+            <input type="hidden" name="image" id="imageData">
+
+            <button type="submit">Add</button>
+        </form>
+
+        <h3>Existing Users</h3>
+        <ul>
+            {% for user_id, user in users.items() %}
+                <li>
+                    <span>{{ user.name }} - {{ user.role }}</span>
+                    <div class="actions">
+                        <!-- Edit Role -->
+                        <form action="/admin" method="POST" style="display:inline;">
+                            <input type="hidden" name="user_id" value="{{ user_id }}">
+                            <input type="hidden" name="action" value="edit">
+                            <select name="new_role" required>
+                                <option value="admin" {% if user.role == "admin" %}selected{% endif %}>Admin</option>
+                                <option value="user" {% if user.role == "user" %}selected{% endif %}>User</option>
+                            </select>
+                            <button class="edit" type="submit">Edit</button>
+                        </form>
+                        <!-- Delete User -->
+                        <form action="/admin" method="POST" style="display:inline;">
+                            <input type="hidden" name="user_id" value="{{ user_id }}">
+                            <input type="hidden" name="action" value="delete">
+                            <button class="delete" type="submit">Delete</button>
+                        </form>
+                    </div>
+                </li>
+            {% endfor %}
+        </ul>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+    <script>
+        const video = document.getElementById('video');
+        const canvas = document.getElementById('canvas');
+        const captureButton = document.getElementById('capture');
+        const imageDataInput = document.getElementById('imageData');
+
+        navigator.mediaDevices.getUserMedia({ video: true })
+            .then(stream => {
+                video.srcObject = stream;
+            })
+            .catch(error => {
+                console.error('Error accessing the camera:', error);
+            });
+
+        captureButton.addEventListener('click', () => {
+            const context = canvas.getContext('2d');
+            canvas.width = video.videoWidth;
+            canvas.height = video.videoHeight;
+            context.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+            const imageData = canvas.toDataURL('image/png');
+            imageDataInput.value = imageData;
+        });
+
+        const addCandidateButton = document.getElementById('add-candidate');
+        const candidatesContainer = document.getElementById('candidates-container');
+
+        addCandidateButton.addEventListener('click', () => {
+            const candidateDiv = document.createElement('div');
+            candidateDiv.classList.add('candidate');
+            candidateDiv.innerHTML = `
+                <label>Candidate Name:</label>
+                <input type="text" name="candidate_name[]" required>
+
+                <label>Candidate Party:</label>
+                <input type="text" name="candidate_party[]" required>
+            `;
+            candidatesContainer.appendChild(candidateDiv);
+        });
+
+        const votesData = {{ votes | tojson }};
+        for (const voteId in votesData) {
+            const vote = votesData[voteId];
+            const ctx = document.getElementById(`chart-${voteId}`).getContext('2d');
+            const labels = vote.candidates.map(candidate => candidate.name + ` (${candidate.party})`);
+            const data = vote.candidates.map(candidate => candidate.votes);
+
+            new Chart(ctx, {
+                type: 'pie',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        label: 'Votes',
+                        data: data,
+                        backgroundColor: [
+                            'rgba(255, 99, 132, 0.5)',
+                            'rgba(54, 162, 235, 0.5)',
+                            'rgba(255, 206, 86, 0.5)',
+                            'rgba(75, 192, 192, 0.5)',
+                            'rgba(153, 102, 255, 0.5)',
+                            'rgba(255, 159, 64, 0.5)'
+                        ],
+                        borderColor: [
+                            'rgba(255, 99, 132, 1)',
+                            'rgba(54, 162, 235, 1)',
+                            'rgba(255, 206, 86, 1)',
+                            'rgba(75, 192, 192, 1)',
+                            'rgba(153, 102, 255, 1)',
+                            'rgba(255, 159, 64, 1)'
+                        ],
+                        borderWidth: 1
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    plugins: {
+                        legend: {
+                            position: 'top'
+                        }
+                    }
+                }
+            });
+        }
+    </script>
+</body>
+</html>

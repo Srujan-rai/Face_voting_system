@@ -1,0 +1,253 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>User Page</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f4f4f4;
+            margin: 0;
+            padding: 0;
+        }
+
+        .container {
+            max-width: 800px;
+            margin: 50px auto;
+            background: #fff;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+        }
+
+        h1, h2 {
+            text-align: center;
+            color: #333;
+        }
+
+        .vote {
+            margin-bottom: 20px;
+            padding: 15px;
+            border: 1px solid #ccc;
+            border-radius: 8px;
+        }
+
+        .vote h3 {
+            margin: 0 0 10px;
+            color: #333;
+        }
+
+        .vote ul {
+            list-style-type: none;
+            padding: 0;
+        }
+
+        .vote ul li {
+            background: #f9f9f9;
+            padding: 10px;
+            margin-bottom: 5px;
+            border-radius: 4px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .vote ul li button {
+            background-color: #007BFF;
+            color: white;
+            padding: 8px 15px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+        }
+
+        .vote ul li button:hover {
+            background-color: #0056b3;
+        }
+
+        .vote ul li button[disabled] {
+            background-color: #ccc;
+            cursor: not-allowed;
+        }
+
+        .logout {
+            display: block;
+            margin: 20px auto;
+            padding: 10px 20px;
+            background-color: #FF0000;
+            color: white;
+            text-align: center;
+            text-decoration: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 16px;
+        }
+
+        .logout:hover {
+            background-color: #CC0000;
+        }
+
+        #camera-modal {
+            display: none;
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: #fff;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+            z-index: 1000;
+            text-align: center;
+        }
+
+        #camera-modal video {
+            width: 100%;
+            max-width: 300px;
+            margin-bottom: 10px;
+            border-radius: 8px;
+        }
+
+        #camera-modal button {
+            margin-top: 10px;
+            background-color: #007BFF;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+        }
+
+        #camera-modal button:hover {
+            background-color: #0056b3;
+        }
+
+        #camera-modal canvas {
+            display: block;
+            margin: 10px auto;
+            width: 100px;
+            height: auto;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+        }
+
+        #camera-modal form {
+            display: inline-block;
+            margin-top: 10px;
+        }
+
+        #camera-modal form button {
+            background-color: #28a745;
+            color: white;
+        }
+
+        #camera-modal form button:hover {
+            background-color: #218838;
+        }
+
+        #overlay {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.5);
+            z-index: 999;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Welcome, User</h1>
+        {% if error %}
+            <p style="color: red; text-align: center;">{{ error }}</p>
+        {% endif %}
+        <h2>Available Votes</h2>
+        {% for vote_id, vote in votes.items() %}
+            <div class="vote">
+                <h3>{{ vote.vote_name }}</h3>
+                <p>Choose your candidate:</p>
+                <ul>
+                    {% for candidate in vote.candidates %}
+                        <li>
+                            {{ candidate.name }} ({{ candidate.party }})
+                            {% if has_voted.get(vote_id, False) %}
+                                <button disabled>You have already voted</button>
+                            {% else %}
+                                <button onclick="openCamera('{{ vote_id }}', '{{ candidate.name }}')">Vote</button>
+                            {% endif %}
+                        </li>
+                    {% endfor %}
+                </ul>
+            </div>
+        {% endfor %}
+
+        <a href="/logout" class="logout">Logout</a>
+    </div>
+
+    <!-- Overlay -->
+    <div id="overlay"></div>
+
+    <!-- Camera Modal -->
+    <div id="camera-modal">
+        <video id="video" autoplay></video>
+        <canvas id="canvas"></canvas>
+        <button id="capture">Capture Photo</button>
+        <form id="voteForm" action="/cast_vote" method="POST">
+            <input type="hidden" name="vote_id" id="vote_id">
+            <input type="hidden" name="candidate_name" id="candidate_name">
+            <input type="hidden" name="image" id="imageData">
+            <button type="submit">Submit Vote</button>
+        </form>
+    </div>
+
+    <script>
+        const video = document.getElementById("video");
+        const canvas = document.getElementById("canvas");
+        const captureButton = document.getElementById("capture");
+        const voteForm = document.getElementById("voteForm");
+        const voteIdInput = document.getElementById("vote_id");
+        const candidateNameInput = document.getElementById("candidate_name");
+        const imageDataInput = document.getElementById("imageData");
+        const cameraModal = document.getElementById("camera-modal");
+        const overlay = document.getElementById("overlay");
+
+        function openCamera(voteId, candidateName) {
+            cameraModal.style.display = "block";
+            overlay.style.display = "block";
+            voteIdInput.value = voteId;
+            candidateNameInput.value = candidateName;
+
+            navigator.mediaDevices.getUserMedia({ video: true })
+                .then(stream => {
+                    video.srcObject = stream;
+                })
+                .catch(error => {
+                    console.error("Error accessing the camera:", error);
+                });
+        }
+
+        captureButton.addEventListener("click", () => {
+            const context = canvas.getContext("2d");
+            canvas.width = video.videoWidth;
+            canvas.height = video.videoHeight;
+            context.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+            const imageData = canvas.toDataURL("image/png");
+            imageDataInput.value = imageData;
+
+            voteForm.style.display = "block";
+        });
+
+        overlay.addEventListener("click", () => {
+            cameraModal.style.display = "none";
+            overlay.style.display = "none";
+            video.srcObject.getTracks().forEach(track => track.stop());
+        });
+    </script>
+</body>
+</html>
